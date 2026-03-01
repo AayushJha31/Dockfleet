@@ -14,3 +14,7 @@ Purpose:
 - /logs/{service} → real-time logs (SSE later)
 - /metrics    → aggregated metrics
 - /           → dashboard UI
+
+## Run Locally
+
+uvicorn dockfleet.dashboard.api:app --reload --port 8080
