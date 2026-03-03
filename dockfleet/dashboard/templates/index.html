@@ -4,26 +4,98 @@
     <meta charset="UTF-8">
     <title>DockFleet Dashboard</title>
 
-    <!-- Tailwind CDN -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Alpine.js CDN -->
+    <!-- Alpine JS -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
-<body class="bg-gray-900 text-white min-h-screen">
+<body 
+    class="bg-gray-100 dark:bg-gray-900 text-black dark:text-white min-h-screen"
+    x-data="dashboard()"
+    x-init="fetchServices()"
+>
 
-<div class="container mx-auto p-8" x-data="{ message: 'Dashboard Loaded Successfully 🚀' }">
+<div class="container mx-auto px-6 py-8">
 
-    <h1 class="text-4xl font-bold mb-6">
-        DockFleet Dashboard
-    </h1>
-
-    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-        <p class="text-lg" x-text="message"></p>
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold">DockFleet Dashboard</h1>
     </div>
 
+    <!-- Services Grid -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <template x-for="service in services" :key="service.name">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg transition">
+
+                <!-- Service Name -->
+                <h2 class="text-xl font-semibold mb-4" x-text="service.name"></h2>
+
+                <!-- Metrics -->
+                <div class="space-y-1 text-sm">
+                    <p>Status: <span class="font-medium" x-text="service.status"></span></p>
+                    <p>CPU: <span x-text="service.cpu"></span></p>
+                    <p>Memory: <span x-text="service.memory"></span></p>
+                    <p>Uptime: <span x-text="service.uptime"></span></p>
+                    <p>Restarts: <span x-text="service.restart_count"></span></p>
+                    <p>Health: <span x-text="service.health_status"></span></p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-5 flex gap-3">
+                    <button 
+                        @click="restartService(service.name)"
+                        class="bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition">
+                        Restart
+                    </button>
+
+                    <button 
+                        @click="stopService(service.name)"
+                        class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-500 transition">
+                        Stop
+                    </button>
+                </div>
+
+            </div>
+        </template>
+
+    </div>
 </div>
+
+
+<!-- Alpine Dashboard Script -->
+<script>
+function dashboard() {
+    return {
+        services: [],
+        darkMode: true,
+
+        async fetchServices() {
+            try {
+                const response = await fetch('/services');
+                this.services = await response.json();
+            } catch (error) {
+                console.error("Failed to fetch services:", error);
+            }
+        },
+
+        restartService(name) {
+            console.log("Restart clicked:", name);
+        },
+
+        stopService(name) {
+            console.log("Stop clicked:", name);
+        },
+
+        toggleDarkMode() {
+            this.darkMode = !this.darkMode;
+            document.documentElement.classList.toggle('dark');
+        }
+    }
+}
+</script>
 
 </body>
 </html>
