@@ -36,29 +36,26 @@ def list_services():
         Service(
             name="api",
             status="running",
-            cpu=18,
-            memory=320,
-            uptime="4h 12m",
-            restart_count=1,
-            health_status="healthy"
+            image="dockfleet-api:latest",
+            ports="8000:8000",
+            restart_policy="always",
+            restart_count=1
         ),
         Service(
             name="worker",
             status="restarting",
-            cpu=5,
-            memory=150,
-            uptime="12m",
-            restart_count=5,
-            health_status="degraded"
+            image="dockfleet-worker:latest",
+            ports="-",
+            restart_policy="on-failure",
+            restart_count=5
         ),
         Service(
             name="scheduler",
             status="stopped",
-            cpu=0,
-            memory=0,
-            uptime="0m",
-            restart_count=2,
-            health_status="unhealthy"
+            image="dockfleet-scheduler:latest",
+            ports="-",
+            restart_policy="no",
+            restart_count=2
         )
     ]
 
