@@ -182,6 +182,55 @@ def test_cli_logs_success_follow(mock_run):
 
 
 @patch("dockfleet.cli.main.subprocess.run")
+def test_cli_logs_follow_keyboard_interrupt(mock_run):
+    """Test that dockfleet logs --follow exits cleanly with code 0 on KeyboardInterrupt."""
+    from unittest.mock import MagicMock
+
+    mock_run.side_effect = [MagicMock(returncode=0), KeyboardInterrupt()]
+    result = runner.invoke(app, ["logs", "web", "--follow"])
+    assert result.exit_code == 0
+    assert "Streaming logs for web" in result.stdout
+    assert "Service 'web' not found or container not running." not in result.stdout
+
+
+@patch("dockfleet.cli.main.subprocess.run")
+def test_cli_logs_follow_interrupt_returncode_130(mock_run):
+    """Test that dockfleet logs --follow exits cleanly with code 0 on SIGINT return code (130)."""
+    from unittest.mock import MagicMock
+
+    mock_run.side_effect = [MagicMock(returncode=0), MagicMock(returncode=130)]
+    result = runner.invoke(app, ["logs", "web", "--follow"])
+    assert result.exit_code == 0
+    assert "Streaming logs for web" in result.stdout
+    assert "Service 'web' not found or container not running." not in result.stdout
+
+
+@patch("dockfleet.cli.main.subprocess.run")
+def test_cli_logs_follow_interrupt_returncode_windows(mock_run):
+    """Test that dockfleet logs --follow exits cleanly with code 0 on Windows Ctrl+C (0xC000013A)."""
+    from unittest.mock import MagicMock
+
+    mock_run.side_effect = [MagicMock(returncode=0), MagicMock(returncode=3221225786)]
+    result = runner.invoke(app, ["logs", "web", "--follow"])
+    assert result.exit_code == 0
+    assert "Streaming logs for web" in result.stdout
+    assert "Service 'web' not found or container not running." not in result.stdout
+
+
+@patch("dockfleet.cli.main.subprocess.run")
+def test_cli_logs_follow_interrupt_returncode_signal(mock_run):
+    """Test that dockfleet logs --follow exits cleanly with code 0 on negative SIGINT return code."""
+    from unittest.mock import MagicMock
+
+    mock_run.side_effect = [MagicMock(returncode=0), MagicMock(returncode=-2)]
+    result = runner.invoke(app, ["logs", "web", "--follow"])
+    assert result.exit_code == 0
+    assert "Streaming logs for web" in result.stdout
+    assert "Service 'web' not found or container not running." not in result.stdout
+
+
+
+@patch("dockfleet.cli.main.subprocess.run")
 def test_cli_logs_success_no_follow(mock_run):
     """Test that dockfleet logs outputs logs when container exists."""
     from unittest.mock import MagicMock
