@@ -385,17 +385,21 @@ def logs(
 @app.command("show-logs")
 def show_logs(
     service: str = typer.Option(None, "--service", help="Filter by service name"),
-    limit: int = typer.Option(50, "--limit", help="Number of logs to show"),
+    limit: int = typer.Option(10, "--limit", help="Number of logs to show"),
 ):
     """
     Show aggregated logs stored in DockFleet database.
     """
     try:
         with get_session() as session:
-            query = select(LogEvent).limit(limit)
+            query = select(LogEvent)
 
             if service:
                 query = query.where(LogEvent.service_name == service)
+
+            query = query.order_by(
+                LogEvent.created_at.desc(), LogEvent.id.desc()
+            ).limit(limit)
 
             logs = session.exec(query).all()
 
