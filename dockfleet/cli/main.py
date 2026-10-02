@@ -349,12 +349,23 @@ def logs(
 
         if follow:
             typer.echo(f"Streaming logs for {service} (Ctrl+C to stop)\n")
-            result = subprocess.run(
-                ["docker", "logs", "-f", "--tail", str(lines), container_name]
-            )
-            if result.returncode != 0:
-                typer.echo(f"Service '{service}' not found or container not running.")
-                raise typer.Exit(code=1)
+            try:
+                result = subprocess.run(
+                    ["docker", "logs", "-f", "--tail", str(lines), container_name]
+                )
+            except KeyboardInterrupt:
+                raise typer.Exit(code=0)
+
+            interrupt_codes = {0, 130, 0xC000013A, 3221225786, -1073741510}
+            if hasattr(signal, "SIGINT"):
+                interrupt_codes.add(-signal.SIGINT)
+                interrupt_codes.add(signal.SIGINT)
+
+            if result.returncode in interrupt_codes:
+                raise typer.Exit(code=0)
+
+            typer.echo(f"Service '{service}' not found or container not running.")
+            raise typer.Exit(code=1)
         else:
             result = subprocess.run(
                 ["docker", "logs", "--tail", str(lines), container_name],
@@ -370,6 +381,8 @@ def logs(
                 typer.echo(err_msg)
                 raise typer.Exit(code=1)
             typer.echo(result.stdout)
+    except KeyboardInterrupt:
+        raise typer.Exit(code=0)
     except typer.Exit:
         raise
     except Exception:
