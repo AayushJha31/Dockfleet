@@ -7,7 +7,7 @@ from httpx import ASGITransport
 from sqlmodel import Session, SQLModel, create_engine
 
 from dockfleet.dashboard.api import app
-from dockfleet.dashboard.routes import system_status
+from dockfleet.dashboard.routes import get_metrics, system_status
 from dockfleet.dashboard.services import get_services
 from dockfleet.health.models import ContainerStatus, HealthStatus, get_session
 from dockfleet.health.models import Service as DBService
@@ -287,4 +287,96 @@ def test_system_status_counts_restarting_services(monkeypatch):
         assert data["running"] == 3
         assert data["unhealthy"] == 1
         assert data["stopped"] == 1
+
+
+def test_metrics_calculates_stopped_and_running_from_container_status(monkeypatch, tmp_path):
+    """
+    Verify that GET /metrics calculates running_services from container lifecycle status
+    (status == 'running') and stopped_services (status == 'stopped'), rather than health_status.
+    """
+    db_path = tmp_path / "test.db"
+    test_engine = create_engine(f"sqlite:///{db_path}")
+    SQLModel.metadata.create_all(test_engine)
+
+    with Session(test_engine) as session:
+        # Service 1: running container, healthy
+        svc_healthy = DBService(
+            name="web_healthy",
+            status=ContainerStatus.RUNNING,
+            health_status=HealthStatus.HEALTHY,
+            image="nginx:alpine",
+            restart_policy="always",
+            restart_count=0,
+        )
+        # Service 2: running container, unhealthy (still an active running container)
+        svc_unhealthy = DBService(
+            name="web_unhealthy",
+            status=ContainerStatus.RUNNING,
+            health_status=HealthStatus.UNHEALTHY,
+            image="nginx:alpine",
+            restart_policy="always",
+            restart_count=2,
+        )
+        # Service 3: stopped container
+        svc_stopped = DBService(
+            name="web_stopped",
+            status=ContainerStatus.STOPPED,
+            health_status=HealthStatus.HEALTHY,
+            image="nginx:alpine",
+            restart_policy="always",
+            restart_count=1,
+        )
+        session.add_all([svc_healthy, svc_unhealthy, svc_stopped])
+        session.commit()
+
+    monkeypatch.setattr(
+        "dockfleet.dashboard.services.get_session",
+        lambda: get_session(engine=test_engine),
+    )
+    monkeypatch.setattr(
+        "dockfleet.dashboard.routes.get_session",
+        lambda: get_session(engine=test_engine),
+    )
+
+    docker_ps_output = "\n".join(
+        [
+            json.dumps({"Names": "dockfleet_web_healthy", "Status": "Up 10 minutes", "RunningFor": "10 minutes"}),
+            json.dumps({"Names": "dockfleet_web_unhealthy", "Status": "Up 5 minutes", "RunningFor": "5 minutes"}),
+            json.dumps({"Names": "dockfleet_web_stopped", "Status": "Exited (0) 5 minutes ago", "RunningFor": "5 minutes"}),
+        ]
+    )
+
+    def mock_subprocess_run(cmd, *args, **kwargs):
+        mock_res = MagicMock()
+        if "ps" in cmd:
+            mock_res.stdout = docker_ps_output
+        elif "stats" in cmd:
+            mock_res.stdout = ""
+        return mock_res
+
+    with patch("subprocess.run", side_effect=mock_subprocess_run):
+        # 1. Direct function call
+        metrics = get_metrics()
+        assert metrics.total_services == 3
+        assert metrics.running_services == 2  # web_healthy and web_unhealthy are both running
+        assert metrics.unhealthy_services == 1  # web_unhealthy is failing health checks
+        assert metrics.stopped_services == 1  # web_stopped is stopped
+        assert metrics.total_restarts == 3
+
+        # 2. HTTP GET /metrics endpoint call
+        async def _test_http():
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://testserver"
+            ) as client:
+                return await client.get("/metrics")
+
+        response = asyncio.run(_test_http())
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_services"] == 3
+        assert data["running_services"] == 2
+        assert data["unhealthy_services"] == 1
+        assert data["stopped_services"] == 1
+        assert data["total_restarts"] == 3
+
 
