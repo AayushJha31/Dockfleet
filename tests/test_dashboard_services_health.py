@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 from httpx import ASGITransport
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from dockfleet.dashboard.api import app
 from dockfleet.dashboard.routes import get_metrics, system_status
